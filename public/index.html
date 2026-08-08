@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>DRONE DEFENSE</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===================== MAIN MENU ===================== -->
+<div id="menu" class="screen">
+  <div class="menu-box">
+    <h1>DRONE <span>DEFENSE</span></h1>
+    <p class="sub">Дрон против роботизированной обороны базы</p>
+
+    <label>Ник
+      <input id="nickInput" maxlength="16" placeholder="Введите ник" />
+    </label>
+
+    <div class="role-select">
+      <button class="role-btn active" data-role="human">Человек (оружие)</button>
+      <button class="role-btn" data-role="drone">Дрон (FPV)</button>
+    </div>
+
+    <button id="playBtn" class="play-btn">ИГРАТЬ</button>
+
+    <div class="menu-footer">
+      <span id="onlineCount">Онлайн: —</span>
+      <span id="connStatus">Подключение...</span>
+    </div>
+  </div>
+
+  <div class="lobby-chat">
+    <div id="lobbyMessages" class="chat-messages"></div>
+    <div class="chat-input-row">
+      <input id="lobbyChatInput" maxlength="240" placeholder="Написать в чат... (Enter)" />
+      <button id="lobbySendBtn">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== GAME SCREEN ===================== -->
+<div id="game" class="screen hidden">
+  <canvas id="c"></canvas>
+
+  <!-- Drone FPV HUD (matches reference goggles overlay) -->
+  <div id="droneHud" class="hud hidden">
+    <div class="hud-top">
+      <div class="hud-top-left">
+        <span class="hud-icon">🛰</span><span id="satCount">14</span>
+        <span class="hud-sep"></span>
+        <span class="hud-icon">↕</span><span id="homeDist">153m</span>
+      </div>
+      <div class="hud-compass">
+        <span>W</span><span class="dash"></span><span id="compassN">N</span><span class="dash"></span><span>E</span>
+        <div id="headingDeg">15°</div>
+      </div>
+      <div class="hud-top-right">
+        <span class="hud-icon">🔋</span><span id="battLow">3.7V</span>
+        <span class="hud-sep"></span>
+        <span class="hud-icon">🔋</span><span id="battHigh">12.4V</span>
+      </div>
+    </div>
+    <div class="hud-rec">
+      <span class="rec-dot">●</span> REC <span id="recRes">4K</span> <span id="recFps">FPS60</span>
+    </div>
+
+    <div class="hud-mid">
+      <div class="hud-alt">Alt <span id="altVal">73</span></div>
+      <div class="hud-reticle">
+        <div class="ret-tick left"></div>
+        <div class="ret-arrow left">◀</div>
+        <div class="ret-line"></div>
+        <div class="ret-center">✛</div>
+        <div class="ret-line"></div>
+        <div class="ret-arrow right">▶</div>
+        <div class="ret-tick right"></div>
+      </div>
+      <div class="hud-speed">⇄ <span id="speedVal">35</span> k/h</div>
+    </div>
+
+    <div class="hud-bottom">
+      <div id="tempVal">23 C°</div>
+      <div id="gpsCoords">N52°14'48.26" E021°04'14.31"</div>
+      <div class="hud-timers"><div id="clock1">12:35:44</div><div id="clock2">0:00</div><div id="clock3">0:00</div></div>
+    </div>
+  </div>
+
+  <!-- Human HUD -->
+  <div id="humanHud" class="hud hidden">
+    <div class="crosshair"></div>
+    <div class="ammo-box"><span id="ammoVal">30</span> / <span id="magVal">90</span></div>
+    <div class="hp-box">HP <span id="hpVal">100</span></div>
+    <div class="weapon-hint" id="weaponHint">ЛКМ — прицел &nbsp;|&nbsp; ПКМ/удерж — стрельба &nbsp;|&nbsp; R — перезарядка</div>
+  </div>
+
+  <!-- Shared round HUD -->
+  <div id="roundHud" class="round-hud">
+    <div id="roundTimer">10:00</div>
+    <div id="killFeed"></div>
+  </div>
+
+  <!-- In-game chat -->
+  <div id="gameChat" class="game-chat hidden">
+    <div id="gameChatMessages" class="chat-messages"></div>
+    <input id="gameChatInput" maxlength="240" placeholder="Enter — написать, Esc — закрыть" />
+  </div>
+
+  <button id="menuExitBtn" class="menu-exit-btn">☰ Меню</button>
+
+  <!-- Round end overlay -->
+  <div id="roundEnd" class="round-end hidden">
+    <h2>МАТЧ ОКОНЧЕН</h2>
+    <p>Карта обновляется...</p>
+    <div id="roundEndCountdown">5</div>
+    <button id="backToMenuBtn">В главное меню</button>
+  </div>
+
+  <div id="crosshairHelp" class="crosshair-help">Кликните, чтобы захватить курсор мыши</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"></script>
+<script src="net.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

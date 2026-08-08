@@ -1,0 +1,98 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #05070a; font-family: 'Segoe UI', Arial, sans-serif; color: #d8e6e6; }
+.hidden { display: none !important; }
+.screen { position: fixed; inset: 0; }
+
+/* ===================== MENU ===================== */
+#menu {
+  display: flex; align-items: center; justify-content: center; gap: 40px;
+  background: radial-gradient(circle at 50% 20%, #12222a 0%, #05070a 70%);
+}
+.menu-box {
+  width: 360px; padding: 32px; background: rgba(10,18,22,0.85);
+  border: 1px solid #2a4a4a; border-radius: 10px; text-align: center;
+}
+.menu-box h1 { font-size: 28px; letter-spacing: 3px; margin-bottom: 4px; }
+.menu-box h1 span { color: #5be27a; }
+.sub { color: #7c9a9a; font-size: 12px; margin-bottom: 22px; }
+.menu-box label { display: block; text-align: left; font-size: 12px; color: #9ec; margin-bottom: 6px; }
+#nickInput, #lobbyChatInput, #gameChatInput {
+  width: 100%; padding: 10px; margin-bottom: 16px; background: #0c1517; border: 1px solid #2a4a4a;
+  color: #d8e6e6; border-radius: 6px; font-size: 14px;
+}
+.role-select { display: flex; gap: 8px; margin-bottom: 18px; }
+.role-btn {
+  flex: 1; padding: 10px 6px; background: #0c1517; border: 1px solid #2a4a4a; color: #9ec;
+  border-radius: 6px; cursor: pointer; font-size: 12px;
+}
+.role-btn.active { background: #163020; border-color: #5be27a; color: #5be27a; }
+.play-btn {
+  width: 100%; padding: 14px; background: #5be27a; border: none; border-radius: 6px;
+  color: #05070a; font-weight: bold; letter-spacing: 2px; cursor: pointer; font-size: 15px;
+}
+.play-btn:hover { background: #7cf199; }
+.menu-footer { display: flex; justify-content: space-between; margin-top: 16px; font-size: 11px; color: #6a8888; }
+
+.lobby-chat { width: 300px; height: 420px; background: rgba(10,18,22,0.85); border: 1px solid #2a4a4a; border-radius: 10px; display: flex; flex-direction: column; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 10px; font-size: 12px; }
+.chat-messages div { margin-bottom: 6px; line-height: 1.4; word-wrap: break-word; }
+.chat-messages .sys { color: #6a8888; font-style: italic; }
+.chat-messages b { color: #5be27a; }
+.chat-input-row { display: flex; border-top: 1px solid #2a4a4a; }
+.chat-input-row input { flex: 1; border: none; border-radius: 0; margin: 0; }
+.chat-input-row button { width: 44px; background: #163020; border: none; color: #5be27a; cursor: pointer; }
+
+/* ===================== GAME ===================== */
+#c { position: absolute; inset: 0; display: block; }
+.hud { position: absolute; inset: 0; pointer-events: none; font-family: 'Consolas', monospace; }
+
+/* ---- Drone FPV HUD (matches goggle-overlay reference) ---- */
+.hud-top { position: absolute; top: 14px; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 0 24px; font-size: 13px; color: #bfe8e8; }
+.hud-top-left, .hud-top-right { display: flex; align-items: center; gap: 6px; }
+.hud-sep { width: 12px; }
+.hud-icon { opacity: .85; }
+.hud-compass { text-align: center; font-size: 13px; letter-spacing: 6px; color: #bfe8e8; }
+.hud-compass .dash { display: inline-block; width: 26px; border-top: 1px solid #bfe8e8; margin: 0 4px; vertical-align: middle; }
+#compassN { color: #5be2c8; font-weight: bold; }
+#headingDeg { text-align: center; font-size: 12px; margin-top: 2px; }
+
+.hud-rec { position: absolute; top: 44px; right: 24px; font-size: 12px; color: #ff5b5b; display: flex; align-items: center; gap: 6px; }
+.rec-dot { animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+
+.hud-mid { position: absolute; top: 50%; left: 0; right: 0; transform: translateY(-50%); display: flex; align-items: center; justify-content: space-between; padding: 0 40px; }
+.hud-alt, .hud-speed { font-size: 13px; color: #bfe8e8; }
+.hud-reticle { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; position: relative; }
+.ret-line { width: 90px; height: 0; border-top: 2px dashed #e8f5f5; }
+.ret-center { font-size: 18px; color: #e8f5f5; }
+.ret-arrow { font-size: 14px; color: #e8f5f5; }
+.ret-tick { width: 1px; height: 130px; background: repeating-linear-gradient(to bottom, #6f9a9a 0 3px, transparent 3px 9px); opacity: .7; }
+
+.hud-bottom { position: absolute; bottom: 14px; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 24px; font-size: 12px; color: #bfe8e8; }
+.hud-timers { text-align: right; font-size: 11px; opacity: .8; }
+
+/* ---- Human HUD ---- */
+.crosshair { position: absolute; top: 50%; left: 50%; width: 18px; height: 18px; transform: translate(-50%,-50%); border: 1.5px solid #e8f5f5aa; border-radius: 50%; }
+.crosshair::before, .crosshair::after { content: ''; position: absolute; background: #e8f5f5cc; }
+.crosshair::before { top: 50%; left: -8px; width: 6px; height: 1.5px; }
+.crosshair::after { top: 50%; right: -8px; width: 6px; height: 1.5px; }
+.ammo-box { position: absolute; bottom: 24px; right: 30px; font-size: 22px; color: #e8f5f5; font-family: Consolas, monospace; }
+.hp-box { position: absolute; bottom: 24px; left: 30px; font-size: 20px; color: #7cf199; }
+.weapon-hint { position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #9ec; opacity: .8; }
+
+.round-hud { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); text-align: center; pointer-events: none; }
+#roundTimer { font-size: 18px; color: #e8f5f5; background: rgba(0,0,0,.35); padding: 4px 14px; border-radius: 6px; }
+#killFeed { margin-top: 6px; font-size: 11px; color: #ff8b8b; display: flex; flex-direction: column; gap: 2px; align-items: center; }
+
+.menu-exit-btn { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,.4); border: 1px solid #2a4a4a; color: #d8e6e6; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+
+.game-chat { position: absolute; bottom: 90px; left: 20px; width: 320px; height: 200px; display: flex; flex-direction: column; }
+.game-chat .chat-messages { background: rgba(0,0,0,.4); border-radius: 6px 6px 0 0; }
+.game-chat input { margin: 0; border-radius: 0 0 6px 6px; }
+
+.round-end { position: absolute; inset: 0; background: rgba(0,0,0,.75); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.round-end h2 { font-size: 32px; letter-spacing: 3px; color: #ff8b8b; }
+#roundEndCountdown { font-size: 40px; color: #5be27a; }
+#backToMenuBtn { padding: 10px 22px; background: #5be27a; border: none; border-radius: 6px; color: #05070a; font-weight: bold; cursor: pointer; }
+
+.crosshair-help { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #9ec; background: rgba(0,0,0,.4); padding: 6px 14px; border-radius: 6px; }
