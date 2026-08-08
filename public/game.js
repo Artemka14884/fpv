@@ -139,6 +139,7 @@ const explosions = [];
 let playerDrone = null;    // when role === drone
 let playerHuman = null;    // when role === human: { body, weaponHeld, ammo, mag, hp }
 let turrets = [];
+let coverProps = [];       // trees / abandoned buildings / factories the player can hide behind (collidable, { mesh, x, z, radius })
 
 function initThree() {
   renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
@@ -182,8 +183,18 @@ function clearMap() {
     if (o.mesh) scene.remove(o.mesh);
     if (o.body) world.removeBody(o.body);
   });
-  dynamicObjects.length = 0; structures.length = 0; enemyDrones.length = 0; turrets = [];
+  dynamicObjects.length = 0; structures.length = 0; enemyDrones.length = 0; turrets = []; coverProps = [];
   bullets.forEach(b => scene.remove(b.mesh)); bullets.length = 0;
+}
+
+// A collidable prop (tree / abandoned building / factory wall) the human player
+// physically can't walk through — and can duck behind for cover.
+function addCoverBox(pos, size, color, extra = {}) {
+  const { mesh, body } = addBox(pos, size, color, 0);
+  Object.assign(mesh.material, extra);
+  const radius = Math.max(size.x, size.z) / 2;
+  coverProps.push({ mesh, x: pos.x, z: pos.z, radius });
+  return { mesh, body };
 }
 
 function addBox(pos, size, color, mass = 0) {
@@ -211,16 +222,52 @@ function buildMap(seed) {
   scene.add(groundMesh);
   dynamicObjects.push({ mesh: groundMesh, body: null });
 
-  // scattered terrain props (non-targets, purely visual clutter)
-  for (let i = 0; i < 40; i++) {
-    const x = (rnd()-0.5)*500, z = (rnd()-0.5)*500;
-    if (Math.hypot(x,z) < 40) continue;
-    const h = 2 + rnd()*4;
-    const geo = new THREE.ConeGeometry(1.2+rnd(), h, 6);
-    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x2f5030 }));
-    mesh.position.set(x, h/2, z); mesh.castShadow = true;
+  // ---- open fields (visual ground patches: wheat / dry grass) ----
+  for (let i = 0; i < 5; i++) {
+    const x = (rnd()-0.5)*440, z = (rnd()-0.5)*440;
+    const w = 40+rnd()*50, l = 40+rnd()*50;
+    const fieldGeo = new THREE.PlaneGeometry(w, l);
+    fieldGeo.rotateX(-Math.PI/2);
+    const fieldColor = rnd() > 0.5 ? 0xc9b458 : 0x7a9a4a;
+    const fieldMesh = new THREE.Mesh(fieldGeo, new THREE.MeshStandardMaterial({ color: fieldColor, roughness: 1 }));
+    fieldMesh.position.set(x, 0.02, z);
+    fieldMesh.receiveShadow = true;
+    scene.add(fieldMesh);
+    dynamicObjects.push({ mesh: fieldMesh, body: null });
+  }
+
+  // ---- trees, denser and varied (visual only, small ones don't block movement) ----
+  for (let i = 0; i < 90; i++) {
+    const x = (rnd()-0.5)*520, z = (rnd()-0.5)*520;
+    if (Math.hypot(x,z) < 35) continue;
+    const h = 2.5 + rnd()*6;
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.28,h*0.35,6), new THREE.MeshStandardMaterial({ color: 0x4a3524 }));
+    trunk.position.set(x, h*0.175, z);
+    trunk.castShadow = true;
+    scene.add(trunk);
+    dynamicObjects.push({ mesh: trunk, body: null });
+    const geo = new THREE.ConeGeometry(1.3+rnd()*0.9, h, 7);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: rnd()>0.5?0x2f5030:0x3a6238 }));
+    mesh.position.set(x, h*0.35 + h/2, z); mesh.castShadow = true;
     scene.add(mesh);
     dynamicObjects.push({ mesh, body: null });
+    // roughly one in three trees is thick enough to actually hide behind
+    if (rnd() > 0.66) coverProps.push({ mesh, x, z, radius: 1.1 });
+  }
+
+  // ---- abandoned buildings (ruined, collidable — cover for the human player) ----
+  const ruinCount = 10;
+  for (let i = 0; i < ruinCount; i++) {
+    let x, z;
+    do { x = (rnd()-0.5)*460; z = (rnd()-0.5)*460; } while (Math.hypot(x,z) < 32);
+    const floors = 1 + Math.floor(rnd()*3);
+    const w = 6+rnd()*5, dpt = 6+rnd()*5, h = floors*3.2;
+    addCoverBox(new THREE.Vector3(x, h/2, z), {x:w,y:h,z:dpt}, 0x6b6b63, { roughness: 1 });
+    // a broken/collapsed slab on top for the "ruin" look
+    if (rnd() > 0.4) {
+      const slab = addBox(new THREE.Vector3(x + (rnd()-0.5)*2, h + 0.2, z + (rnd()-0.5)*2), {x:w*0.7,y:0.4,z:dpt*0.7}, 0x555550, 0);
+      slab.mesh.rotation.z = (rnd()-0.5)*0.3;
+    }
   }
 
   // ---- base structures (drone objectives) ----
@@ -234,6 +281,27 @@ function buildMap(seed) {
     const { mesh, body } = addBox(d.pos, d.size, d.color, 0);
     mesh.userData.kind = d.kind;
     structures.push({ mesh, body, hp: d.hp, maxHp: d.hp, kind: d.kind });
+  });
+
+  // ---- big factories (large objectives, also solid cover) ----
+  const factoryPositions = [
+    new THREE.Vector3(38, 5, 6),
+    new THREE.Vector3(-40, 5, -22),
+  ];
+  factoryPositions.forEach((pos, i) => {
+    const w = 16, h = 10, dpt = 12;
+    const { mesh, body } = addBox(pos, {x:w,y:h,z:dpt}, 0x7a7a6a, 0);
+    mesh.userData.kind = 'factory';
+    structures.push({ mesh, body, hp: 320, maxHp: 320, kind: 'factory' });
+    coverProps.push({ mesh, x: pos.x, z: pos.z, radius: Math.max(w,dpt)/2 });
+    // chimneys
+    for (let c = 0; c < 2; c++) {
+      const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.8,1,8,8), new THREE.MeshStandardMaterial({ color: 0x4a4a44 }));
+      chimney.position.set(pos.x + (c===0?-w/3:w/3), pos.y + h/2 + 4, pos.z);
+      chimney.castShadow = true;
+      scene.add(chimney);
+      dynamicObjects.push({ mesh: chimney, body: null });
+    }
   });
 
   // ---- defense turrets (shoot at drones) ----
@@ -285,6 +353,19 @@ function updateHuman(dt) {
   if (move.lengthSq() > 0) move.normalize().multiplyScalar(speed*dt);
   p.pos.add(move);
 
+  // collide with cover (trees/ruins/factories) so the player can actually hide behind them
+  const playerRadius = 0.5;
+  coverProps.forEach(c => {
+    const dx = p.pos.x - c.x, dz = p.pos.z - c.z;
+    const dist = Math.hypot(dx, dz);
+    const minDist = c.radius + playerRadius;
+    if (dist < minDist && dist > 0.0001) {
+      const push = (minDist - dist) / dist;
+      p.pos.x += dx * push;
+      p.pos.z += dz * push;
+    }
+  });
+
   // simple gravity/jump
   p.jumpVel -= 20*dt;
   p.pos.y += p.jumpVel*dt;
@@ -335,6 +416,8 @@ function forwardCameraDir() {
 // ================================================================
 // PLAYER: DRONE (real-ish flight physics via cannon-es)
 // ================================================================
+const DRONE_SPAWN = { x: 0, y: 22, z: 55 };
+
 function spawnDrone() {
   const geo = new THREE.BoxGeometry(1, 0.25, 1);
   const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x222222 }));
@@ -349,16 +432,21 @@ function spawnDrone() {
     mesh.add(arm);
   }
 
+  // Flight model: the body only translates (mass + inertia + drag give it real
+  // momentum/drift), while orientation is driven directly from mouse-look —
+  // full 6DOF torque flight was too unstable to control, this keeps the
+  // "real physics" feel (acceleration, drag, gravity) but is actually flyable.
   const body = new CANNON.Body({
     mass: 1.2,
     shape: new CANNON.Box(new CANNON.Vec3(0.5,0.15,0.5)),
-    linearDamping: 0.45,
-    angularDamping: 0.7,
+    linearDamping: 0.65,
   });
-  body.position.set(0, 25, 40);
+  body.fixedRotation = true;
+  body.updateMassProperties();
+  body.position.set(DRONE_SPAWN.x, DRONE_SPAWN.y, DRONE_SPAWN.z);
   world.addBody(body);
 
-  playerDrone = { mesh, body, hp: 4, bombs: 3, alive: true, thrust: 0 };
+  playerDrone = { mesh, body, hp: 4, bombs: 3, alive: true, yaw: Math.PI, pitch: -0.12, tiltZ: 0, tiltX: 0 };
   droneHud.classList.remove('hidden');
   humanHud.classList.add('hidden');
 }
@@ -368,32 +456,28 @@ function updateDrone(dt) {
   if (!d.alive) return;
   const b = d.body;
 
-  // thrust (space = up power), pitch/roll via WASD, yaw via A/D... simplified scheme:
-  // W/S = pitch fwd/back, A/D = yaw, Shift/Ctrl = throttle up/down, Q/E = roll
+  const forward = new THREE.Vector3(Math.sin(d.yaw), 0, Math.cos(d.yaw));
+  const right = new THREE.Vector3(Math.sin(d.yaw+Math.PI/2), 0, Math.cos(d.yaw+Math.PI/2));
+
+  const thrustAccel = 16;
+  let horiz = new THREE.Vector3();
+  if (state.keys['KeyW']) horiz.add(forward);
+  if (state.keys['KeyS']) horiz.sub(forward);
+  if (state.keys['KeyD']) horiz.add(right);
+  if (state.keys['KeyA']) horiz.sub(right);
+  if (horiz.lengthSq() > 0) horiz.normalize().multiplyScalar(thrustAccel);
+  b.velocity.x += horiz.x*dt;
+  b.velocity.z += horiz.z*dt;
+
+  // vertical: baseline lift cancels gravity exactly -> hovers with no input
   const throttleUp = state.keys['ShiftLeft'] || state.keys['Space'];
   const throttleDown = state.keys['ControlLeft'] || state.keys['KeyC'];
-  d.thrust += ((throttleUp?1:0) - (throttleDown?1:0)) * dt * 2.2;
-  d.thrust = Math.max(0, Math.min(1.6, d.thrust));
+  const vertInput = (throttleUp?7:0) - (throttleDown?7:0);
+  b.velocity.y += (9.82 + vertInput) * dt;
 
-  const gravityComp = 1.2 * 9.82; // hover thrust needed to counter gravity roughly
-  const up = new CANNON.Vec3(0,1,0).cross ? null : null;
-  const upWorld = b.quaternion.vmult(new CANNON.Vec3(0,1,0));
-  const thrustForce = gravityComp * (0.15 + d.thrust);
-  b.applyForce(new CANNON.Vec3(upWorld.x*thrustForce, upWorld.y*thrustForce, upWorld.z*thrustForce), b.position);
-
-  const pitchInput = (state.keys['KeyS']?1:0) - (state.keys['KeyW']?1:0);
-  const rollInput = (state.keys['KeyD']?1:0) - (state.keys['KeyA']?1:0);
+  // yaw via Q/E as well as mouse (mouse handled in the shared mousemove listener)
   const yawInput = (state.keys['KeyQ']?1:0) - (state.keys['KeyE']?1:0);
-  const torqueStrength = 3.2;
-  const localTorque = new CANNON.Vec3(pitchInput*torqueStrength, yawInput*torqueStrength, -rollInput*torqueStrength);
-  const worldTorque = b.quaternion.vmult(localTorque);
-  b.applyTorque(worldTorque);
-
-  // mild self-leveling for playability
-  const euler = new CANNON.Vec3();
-  b.quaternion.toEuler(euler);
-  b.angularVelocity.x -= euler.x * 0.6 * dt;
-  b.angularVelocity.z -= euler.z * 0.6 * dt;
+  d.yaw += yawInput * 1.6 * dt;
 
   // bomb drop
   if (state.keys['KeyB'] && !d._bombCooldown && d.bombs > 0) {
@@ -402,30 +486,36 @@ function updateDrone(dt) {
     setTimeout(()=>d._bombCooldown=false, 800);
   }
 
+  // cosmetic bank/tilt based on velocity relative to facing (feel of real flight, no instability)
+  const localFwdSpeed = b.velocity.x*forward.x + b.velocity.z*forward.z;
+  const localRightSpeed = b.velocity.x*right.x + b.velocity.z*right.z;
+  d.tiltX += ((-localFwdSpeed*0.03) - d.tiltX) * Math.min(1, dt*4);
+  d.tiltZ += ((-localRightSpeed*0.05) - d.tiltZ) * Math.min(1, dt*4);
+
   d.mesh.position.copy(b.position);
-  d.mesh.quaternion.copy(b.quaternion);
+  d.mesh.rotation.set(d.tiltX, d.yaw, d.tiltZ);
 
-  // camera follows FPV (slightly above drone, looking forward)
-  const camOffset = b.quaternion.vmult(new CANNON.Vec3(0, 0.3, 0));
-  camera.position.set(b.position.x+camOffset.x, b.position.y+camOffset.y, b.position.z+camOffset.z);
-  camera.quaternion.copy(b.quaternion);
-  camera.rotateX(-0.15);
+  // FPV camera follows drone, look direction from mouse (yaw/pitch)
+  camera.position.set(b.position.x, b.position.y+0.25, b.position.z);
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = d.yaw;
+  camera.rotation.x = d.pitch;
+  camera.rotation.z = 0;
 
-  if (b.position.y < 0.4) { crashDrone(d); }
+  if (b.position.y < 0.5) { crashDrone(d); }
 
   updateDroneHud(d);
-  Net.sendState(b.position.x, b.position.y, b.position.z, 0);
+  Net.sendState(b.position.x, b.position.y, b.position.z, d.yaw);
 }
 
 function updateDroneHud(d) {
   const alt = Math.max(0, d.body.position.y).toFixed(0);
   $('altVal').textContent = alt;
-  const speed = d.body.velocity.length()*3.6;
+  const speed = Math.hypot(d.body.velocity.x, d.body.velocity.z, d.body.velocity.y)*3.6;
   $('speedVal').textContent = speed.toFixed(0);
-  const euler = new CANNON.Vec3(); d.body.quaternion.toEuler(euler);
-  let headingDeg = ((euler.y * 180/Math.PI) + 360) % 360;
+  let headingDeg = ((d.yaw * 180/Math.PI) + 360) % 360;
   $('headingDeg').textContent = headingDeg.toFixed(0)+'°';
-  const home = new THREE.Vector2(d.body.position.x-40, d.body.position.z-0);
+  const home = new THREE.Vector2(d.body.position.x, d.body.position.z);
   $('homeDist').textContent = Math.round(home.length())+'m';
   const now = new Date();
   $('clock1').textContent = now.toTimeString().slice(0,8);
@@ -437,10 +527,10 @@ function crashDrone(d) {
   explode(d.body.position, d.mesh);
   setTimeout(() => {
     // respawn after crash
-    d.body.position.set(0, 25, 40);
+    d.body.position.set(DRONE_SPAWN.x, DRONE_SPAWN.y, DRONE_SPAWN.z);
     d.body.velocity.set(0,0,0); d.body.angularVelocity.set(0,0,0);
-    d.body.quaternion.set(0,0,0,1);
-    d.hp = 4; d.thrust = 0; d.alive = true;
+    d.yaw = Math.PI; d.pitch = -0.12; d.tiltX = 0; d.tiltZ = 0;
+    d.hp = 4; d.alive = true;
     d.mesh.visible = true;
   }, 2200);
 }
@@ -705,6 +795,10 @@ document.addEventListener('mousemove', e => {
     playerHuman.yaw -= e.movementX*sens;
     playerHuman.pitch -= e.movementY*sens;
     playerHuman.pitch = Math.max(-1.4, Math.min(1.4, playerHuman.pitch));
+  } else if (state.role === 'drone' && playerDrone) {
+    playerDrone.yaw -= e.movementX*sens;
+    playerDrone.pitch -= e.movementY*sens;
+    playerDrone.pitch = Math.max(-1.2, Math.min(1.2, playerDrone.pitch));
   }
 });
 
