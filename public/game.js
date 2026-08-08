@@ -167,12 +167,12 @@ function initThree() {
 }
 
 function initWorld() {
-  world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+  world = new CANNON.World();
+  world.gravity.set(0, -9.82, 0);
   world.broadphase = new CANNON.SAPBroadphase(world);
   world.allowSleep = true;
 
-  const groundMat = new CANNON.Material('ground');
-  const groundBody = new CANNON.Body({ mass: 0, material: groundMat, shape: new CANNON.Plane() });
+  const groundBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
   groundBody.quaternion.setFromEuler(-Math.PI/2, 0, 0);
   world.addBody(groundBody);
 }
